@@ -7,14 +7,17 @@ cask "axe-beam" do
   desc "Native ntfy notification client for AXE fleet"
   homepage "https://github.com/memjar/axe-beam"
 
-  # Skip Gatekeeper quarantine — AXE internal tool, signed with AXE dev cert
-  disable_quarantine_flags true
-
   app "AXEBeam.app"
+
+  # Strip Gatekeeper quarantine — AXE internal tool
+  postflight do
+    system_command "/usr/bin/xattr",
+                   args: ["-rd", "com.apple.quarantine", "#{appdir}/AXEBeam.app"]
+  end
 
   caveats <<~EOS
     AXE Beam runs in the menu bar.
-    Launch: open /Applications/AXEBeam.app
+    Launch from /Applications or: open /Applications/AXEBeam.app
     Auto-start: System Settings → General → Login Items → add AXEBeam.
   EOS
 
