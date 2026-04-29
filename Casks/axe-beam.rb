@@ -5,14 +5,9 @@ cask "axe-beam" do
   url "https://github.com/memjar/axe-beam/releases/download/v#{version}/AXEBeam-#{version}-mac.zip"
   name "AXE Beam"
   desc "Native ntfy notification client for AXE fleet — training, GitHub, and fleet alerts"
-  homepage "https://axe.observer"
+  homepage "https://github.com/memjar/axe-beam"
 
-  app "AXEBeam.app"
-
-  postflight do
-    system_command "/usr/bin/open",
-                   args: ["-a", "AXEBeam"]
-  end
+  app "AXEBeam.app", target: "AXEBeam.app"
 
   uninstall quit: "ca.axetechnologies.beam-mac"
 
