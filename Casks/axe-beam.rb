@@ -4,10 +4,15 @@ cask "axe-beam" do
 
   url "https://github.com/memjar/axe-beam/releases/download/v#{version}/AXEBeam-#{version}-mac.zip"
   name "AXE Beam"
-  desc "Native ntfy notification client for AXE fleet — training, GitHub, and fleet alerts"
+  desc "Native ntfy notification client for AXE fleet"
   homepage "https://github.com/memjar/axe-beam"
 
-  app "AXEBeam.app", target: "AXEBeam.app"
+  app "AXEBeam.app"
+
+  caveats <<~EOS
+    AXE Beam runs in your menu bar. Launch it from /Applications/AXEBeam.app
+    To start on login: System Settings → General → Login Items → add AXEBeam.
+  EOS
 
   uninstall quit: "ca.axetechnologies.beam-mac"
 
