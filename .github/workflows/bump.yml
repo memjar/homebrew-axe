@@ -1,0 +1,66 @@
+name: Bump casks
+
+on:
+  # Daily safety net — picks up any release we missed.
+  schedule:
+    - cron: "17 6 * * *"
+  # Manual trigger from the Actions tab.
+  workflow_dispatch:
+    inputs:
+      cask:
+        description: "Cask name (blank = all)"
+        required: false
+        default: ""
+  # Upstream apps fire this when they publish a release.
+  # In each app repo's release workflow:
+  #   gh api repos/memjar/homebrew-axe/dispatches \
+  #     -f event_type=upstream-release \
+  #     -F 'client_payload[cask]=axe-beam'
+  repository_dispatch:
+    types: [upstream-release]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Determine target casks
+        id: targets
+        run: |
+          if [ -n "${{ github.event.client_payload.cask }}" ]; then
+            echo "casks=${{ github.event.client_payload.cask }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ inputs.cask }}" ]; then
+            echo "casks=${{ inputs.cask }}" >> "$GITHUB_OUTPUT"
+          else
+            CASKS=$(ls Casks/*.rb | xargs -n1 basename | sed 's/\.rb$//' | tr '\n' ' ')
+            echo "casks=$CASKS" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: bump-cask-pr
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          for cask in ${{ steps.targets.outputs.casks }}; do
+            echo "::group::livecheck $cask"
+            brew livecheck --cask --json "$cask" || true
+            echo "::endgroup::"
+
+            echo "::group::bump $cask"
+            # --no-fork pushes the branch to this tap directly.
+            # If livecheck reports no update, bump-cask-pr exits non-zero — swallow it.
+            brew bump-cask-pr \
+              --no-browse \
+              --no-fork \
+              --message="auto-bumped by homebrew-axe CI" \
+              "$cask" || echo "no bump for $cask"
+            echo "::endgroup::"
+          done
