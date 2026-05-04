@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Homebrew
+        id: set-up-homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Cache Homebrew Bundler RubyGems
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.set-up-homebrew.outputs.gems-path }}
+          key: ${{ runner.os }}-rubygems-${{ steps.set-up-homebrew.outputs.gems-hash }}
+          restore-keys: ${{ runner.os }}-rubygems-
+
+      - name: Install Homebrew Bundler RubyGems
+        run: brew install-bundler-gems
+
+      - name: brew style
+        run: brew style --verbose .
+
+      - name: brew audit (changed casks only)
+        run: |
+          # Find casks changed vs main; on push to main, audit all casks.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            CHANGED=$(git diff --name-only --diff-filter=AM "$BASE"...HEAD -- 'Casks/*.rb' || true)
+          else
+            CHANGED=$(ls Casks/*.rb 2>/dev/null || true)
+          fi
+          if [ -z "$CHANGED" ]; then
+            echo "No cask changes to audit."
+            exit 0
+          fi
+          echo "Auditing:"
+          echo "$CHANGED"
+          for f in $CHANGED; do
+            name=$(basename "$f" .rb)
+            # On PRs, audit added files with --new (stricter); existing files plain.
+            # On main pushes, no --new (everything is already merged).
+            if [ "${{ github.event_name }}" = "pull_request" ] \
+               && git diff --name-status "$BASE"...HEAD -- "$f" 2>/dev/null | grep -q '^A'; then
+              brew audit --cask --online --new "$name"
+            else
+              brew audit --cask --online "$name"
+            fi
+          done
